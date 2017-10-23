@@ -95,10 +95,26 @@ void Graph::print() const
 }
 
 bool Graph::isEulersch() {
-    // Prüfen ob Knotengewicht gerade
-    for (auto nodeid = 0; nodeid < num_nodes(); nodeid++) {
-        if(_nodes[nodeid].adjacent_nodes().size() % 2 != 0) {
-            return false;
+    if(dirtype == Graph::undirected) {
+        // Prüfen ob Knotengewichte gerade
+        for (auto nodeid = 0; nodeid < num_nodes(); nodeid++) {
+            if(_nodes[nodeid].adjacent_nodes().size() % 2 != 0) {
+                return false;
+            }
+        }
+    } else {
+        // Prüfen ob jeder Knoten genausoviele Eingangs wie Ausgangsknoten hat
+        int edge_count [Graph::num_nodes()] = {0};
+        for (auto nodeid = 0; nodeid < num_nodes(); nodeid++) {
+            edge_count[nodeid] += _nodes[nodeid].adjacent_nodes().size();
+            for(auto edgeid = 0; edgeid < _nodes[nodeid].adjacent_nodes().size(); edgeid++) {
+                edge_count[_nodes[nodeid].adjacent_nodes().at(edgeid).id()] -= 1;
+            }
+        }
+        for(auto i = 0; i < Graph::num_nodes(); i++) {
+            if(edge_count[i] != 0) {
+                return false;
+            }
         }
     }
     // Prüfen ob nur eine Zusammenhangskomponente (mit Breitensuche)
@@ -121,6 +137,61 @@ bool Graph::isEulersch() {
     }
     return i == this->num_nodes();
 }
+/**
+ * Die Funktion prüft ob es eine Eulertour gibt und gibt diese als Text aus. Sollte es keine Eulertour geben wird ein Fehler ausgegeben.
+ */
+void Graph::findEulertour() {
+    if(!Graph::isEulersch()) {
+        std::cout << "Der Graph ist nicht eulersch und enthält daher keine Eulertour." << std::endl;
+        return;
+    }
+
+    // Zuerst speichern wir wieviele ausgehende Kanten jeder Knoten hat damit wir wissen welche wir noch abarbeiten müssen und welche Kanten bereits bearbeitet wurden!
+    int edge_count [Graph::num_nodes()];
+    for(int i = 0; i < Graph::num_nodes(); i++) {
+        edge_count[i] = Graph::get_node(i).adjacent_nodes().size();
+    }
+
+    // Wir brauchen einen Stack um uns zu merken welche Kante wir gerade ansehen
+    std::stack<int> currentPath;
+    // Außerdem brauchen wir einen Stack um uns den ganzen Weg zu merken
+    std::stack<int> finalPath;
+    // Und wir legen sofort mal den ersten Knoten auf den Stack
+    currentPath.push(0);
+
+    while(!currentPath.empty()) {
+        Graph::Node currentNode = Graph::get_node(currentPath.top());
+        int currentNodeId = currentPath.top();
+        int currentEdgeCount = edge_count[currentPath.top()];
+        if(edge_count[currentPath.top()] > 0) { // Dieser Knoten hat noch Kanten die abgearbeitet werden müssen
+            // Id des nächsten Knotens finden
+            int nextNodeId = -1;
+            if(dirtype == Graph::directed) {
+                // Bei gerichteten Graphen können wir einfach die nächste ausgehende Kante nehmen
+                nextNodeId = currentNode.adjacent_nodes().at(edge_count[currentPath.top()] - 1).id();
+            } else {
+            }
+
+            // Kantenanzahl reduzieren
+            edge_count[currentPath.top()]--;
+            // Nächsten Knoten in Liste eintragen
+            currentPath.push(nextNodeId);
+        } else { // Alle Kanten dieses Knotens wurden abgearbeitet
+            // Knoten als besucht speichern
+            finalPath.push((int)currentPath.top());
+            // Knoten aus Stack entfernen
+            currentPath.pop();
+        }
+    }
+
+    std::cout << "Folgende Eulertour wurde gefunden:" << std::endl;
+    while(!finalPath.empty()) {
+        int curNode = finalPath.top();
+        std::cout << curNode << std::endl;
+        finalPath.pop();
+    }
+}
+
 
 Graph::Graph(char const * filename, DirType dtype): dirtype(dtype)
 {

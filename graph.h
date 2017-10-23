@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <vector>
+#include <stack>
 
 class Graph {
 public:
@@ -17,6 +18,7 @@ public:
     private:
         Graph::NodeId _id;
         double _edge_weight;
+        bool _marked;
     };
 
     class Node {
@@ -42,6 +44,7 @@ public:
     void print() const;
 
     bool isEulersch();
+    void findEulertour();
 
     const DirType dirtype;
     static const NodeId invalid_node;
