@@ -14,6 +14,8 @@ public:
     public:
         Neighbor(Graph::NodeId n, double w);
         double edge_weight() const;
+        bool isMarked() const;
+        void setMarked(bool marked);
         Graph::NodeId id() const;
     private:
         Graph::NodeId _id;
@@ -25,6 +27,7 @@ public:
     public:
         void add_neighbor(Graph::NodeId nodeid, double weight);
         void setMarked(bool marked);
+        void markEdge(NodeId to);
         bool isMarked();
         const std::vector<Neighbor> & adjacent_nodes() const;
     private:

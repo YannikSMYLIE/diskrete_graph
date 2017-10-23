@@ -2,7 +2,6 @@
 
 #include <fstream>
 #include <sstream>
-#include <stdexcept>
 #include <limits>
 #include "graph.h"
 
@@ -12,7 +11,7 @@ const double Graph::infinite_weight = std::numeric_limits<double>::max();
 
 void Graph::add_nodes(NodeId num_new_nodes)
 {
-    _nodes.resize(num_nodes() + num_new_nodes);
+    _nodes.resize((int)num_nodes() + num_new_nodes);
 }
 
 Graph::Neighbor::Neighbor(Graph::NodeId n, double w): _id(n), _edge_weight(w) {}
@@ -39,6 +38,14 @@ void Graph::Node::setMarked(bool marked) {
 }
 bool Graph::Node::isMarked() {
     return _marked;
+}
+void Graph::Node::markEdge(NodeId to) {
+    for(int i = 0; i < _neighbors.size(); i++) {
+        if(_neighbors.at(i).id() == to && !_neighbors.at(i).isMarked()) {
+            _neighbors.at(i).setMarked(true);
+            break;
+        }
+    }
 }
 
 const std::vector<Graph::Neighbor> & Graph::Node::adjacent_nodes() const
@@ -67,6 +74,12 @@ Graph::NodeId Graph::Neighbor::id() const
 double Graph::Neighbor::edge_weight() const
 {
     return _edge_weight;
+}
+bool Graph::Neighbor::isMarked() const {
+    return _marked;
+}
+void Graph::Neighbor::setMarked(bool marked) {
+    _marked = marked;
 }
 
 void Graph::print() const
@@ -123,7 +136,7 @@ bool Graph::isEulersch() {
     toCheck.push_back(_nodes[0]);
     _nodes[0].setMarked(true);
 
-    while(toCheck.size() > 0) {
+    while(!toCheck.empty()) {
         Graph::Node node = toCheck.back();
         toCheck.pop_back();
 
@@ -149,7 +162,7 @@ void Graph::findEulertour() {
     // Zuerst speichern wir wieviele ausgehende Kanten jeder Knoten hat damit wir wissen welche wir noch abarbeiten müssen und welche Kanten bereits bearbeitet wurden!
     int edge_count [Graph::num_nodes()];
     for(int i = 0; i < Graph::num_nodes(); i++) {
-        edge_count[i] = Graph::get_node(i).adjacent_nodes().size();
+        edge_count[i] = _nodes[i].adjacent_nodes().size();
     }
 
     // Wir brauchen einen Stack um uns zu merken welche Kante wir gerade ansehen
@@ -160,9 +173,8 @@ void Graph::findEulertour() {
     currentPath.push(0);
 
     while(!currentPath.empty()) {
-        Graph::Node currentNode = Graph::get_node(currentPath.top());
+        Graph::Node &currentNode = _nodes[currentPath.top()];
         int currentNodeId = currentPath.top();
-        int currentEdgeCount = edge_count[currentPath.top()];
         if(edge_count[currentPath.top()] > 0) { // Dieser Knoten hat noch Kanten die abgearbeitet werden müssen
             // Id des nächsten Knotens finden
             int nextNodeId = -1;
@@ -170,8 +182,17 @@ void Graph::findEulertour() {
                 // Bei gerichteten Graphen können wir einfach die nächste ausgehende Kante nehmen
                 nextNodeId = currentNode.adjacent_nodes().at(edge_count[currentPath.top()] - 1).id();
             } else {
+                // Finde eine Kante welche noch nicht bearbeitet wurde
+                for(auto i = 0; i < currentNode.adjacent_nodes().size(); i++) {
+                    if(!currentNode.adjacent_nodes().at(i).isMarked()) {
+                        currentNode.markEdge(currentNode.adjacent_nodes().at(i).id());
+                        _nodes[currentNode.adjacent_nodes().at(i).id()].markEdge(currentNodeId);
+                        nextNodeId = currentNode.adjacent_nodes().at(i).id();
+                        edge_count[nextNodeId]--; // Auch hier die Kantenanzahl reduzieren
+                        break;
+                    }
+                }
             }
-
             // Kantenanzahl reduzieren
             edge_count[currentPath.top()]--;
             // Nächsten Knoten in Liste eintragen
