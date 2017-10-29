@@ -1,0 +1,13 @@
+Suche Eulertour f├╝r Instanz 2
+Folgende Eulertour wurde gefunden:
+0
+1
+6
+5
+4
+6
+1
+3
+0
+2
+0

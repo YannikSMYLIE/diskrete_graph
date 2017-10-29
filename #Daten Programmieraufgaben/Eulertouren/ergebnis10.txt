@@ -1,0 +1,2 @@
+Suche Eulertour f├╝r Instanz 10
+Der Graph ist nicht eulersch und enth├ñlt daher keine Eulertour.

@@ -5,82 +5,64 @@
 #include <limits>
 #include "graph.h"
 
+// Unklar was der Quatsch hier sein soll
 const Graph::NodeId Graph::invalid_node = -1;
 const double Graph::infinite_weight = std::numeric_limits<double>::max();
 
+/**
+ * Erzeugt einen Graphen.
+ * @param num int Anzahl der Knoten die der Graph enthalten soll.
+ * @param dtype DirType Angabe ob der Graph gerichtet oder ungerichtet ist.
+ */
+Graph::Graph(int num, DirType dtype): dirtype(dtype), _nodes(num) {}
 
-void Graph::add_nodes(NodeId num_new_nodes)
-{
-    _nodes.resize((int)num_nodes() + num_new_nodes);
-}
 
-Graph::Neighbor::Neighbor(Graph::NodeId n, double w): _id(n), _edge_weight(w) {}
 
-Graph::Graph(NodeId num, DirType dtype): dirtype(dtype), _nodes(num) {}
 
+/**
+ * Fügt dem Graphen eine Kante hinzu.
+ * @param tail Die Id des Startknotens.
+ * @param head  Die Id des Zielknotens.
+ * @param weight Das Gewicht der Kante.
+ */
 void Graph::add_edge(NodeId tail, NodeId head, double weight)
 {
     if (tail >= num_nodes() or tail < 0 or head >= num_nodes() or head < 0) {
         throw std::runtime_error("Edge cannot be added due to undefined endpoint.");
     }
-    _nodes[tail].add_neighbor(head, weight);
+
+    Graph::Edge *edge = new Graph::Edge(weight);
+    _nodes[tail].addEdge(tail, head, edge);
     if (dirtype == Graph::undirected) {
-        _nodes[head].add_neighbor(tail, weight);
+        _nodes[head].addEdge(head, tail, edge);
     }
 }
 
-void Graph::Node::add_neighbor(Graph::NodeId nodeid, double weight)
-{
-    _neighbors.push_back(Graph::Neighbor(nodeid, weight));
-}
-void Graph::Node::setMarked(bool marked) {
-    _marked = marked;
-}
-bool Graph::Node::isMarked() {
-    return _marked;
-}
-void Graph::Node::markEdge(NodeId to) {
-    for(int i = 0; i < _neighbors.size(); i++) {
-        if(_neighbors.at(i).id() == to && !_neighbors.at(i).isMarked()) {
-            _neighbors.at(i).setMarked(true);
-            break;
-        }
-    }
-}
-
-const std::vector<Graph::Neighbor> & Graph::Node::adjacent_nodes() const
-{
-    return _neighbors;
-}
-
-Graph::NodeId Graph::num_nodes() const
+/**
+ * Ermittelt wieviele Knoten im Graph vorhanden sind.
+ * @return int Die Anzahl der Knoten.
+ */
+int Graph::num_nodes() const
 {
     return _nodes.size();
 }
 
-const Graph::Node & Graph::get_node(NodeId node) const
+/**
+ * Findet einen Knoten im Graphen.
+ * @param node NodeId Die Id des zu findenden Knoten.
+ * @return Graph::Node Der Knoten.
+ */
+Graph::Node * Graph::get_node(NodeId node)
 {
-    if (node < 0 or node >= static_cast<int>(_nodes.size())) {
+    if (node < 0 or node >= num_nodes()) {
         throw std::runtime_error("Invalid nodeid in Graph::get_node.");
     }
-    return _nodes[node];
+    return &_nodes[node];
 }
 
-Graph::NodeId Graph::Neighbor::id() const
-{
-    return _id;
-}
-
-double Graph::Neighbor::edge_weight() const
-{
-    return _edge_weight;
-}
-bool Graph::Neighbor::isMarked() const {
-    return _marked;
-}
-void Graph::Neighbor::setMarked(bool marked) {
-    _marked = marked;
-}
+/**
+ * Gibt den Graphen in der Konsole aus
+ */
 
 void Graph::print() const
 {
@@ -101,12 +83,33 @@ void Graph::print() const
         }
         std::cout << " vertex " << nodeid << ":\n";
         for (auto neighbor: _nodes[nodeid].adjacent_nodes()) {
-            std::cout << nodeid << " - " << neighbor.id()
-                      << " weight = " << neighbor.edge_weight() << "\n";
+            std::cout << neighbor.from() << " - " << neighbor.to()
+                      << " weight = " << (neighbor).getWeight();
+            if((neighbor).isMarked()) {
+                std::cout << " - markiert\n";
+            } else {
+                std::cout << " - nicht markiert\n";
+            }
         }
     }
 }
 
+void Graph::add_nodes(NodeId num_new_nodes)
+{
+    _nodes.resize((int)num_nodes() + num_new_nodes);
+}
+
+
+
+
+
+
+
+
+/**
+ * Prüft ob der Graph eulersch ist oder nicht
+ * @return
+ */
 bool Graph::isEulersch() {
     if(dirtype == Graph::undirected) {
         // Prüfen ob Knotengewichte gerade
@@ -121,7 +124,7 @@ bool Graph::isEulersch() {
         for (auto nodeid = 0; nodeid < num_nodes(); nodeid++) {
             edge_count[nodeid] += _nodes[nodeid].adjacent_nodes().size();
             for(auto edgeid = 0; edgeid < _nodes[nodeid].adjacent_nodes().size(); edgeid++) {
-                edge_count[_nodes[nodeid].adjacent_nodes().at(edgeid).id()] -= 1;
+                edge_count[_nodes[nodeid].adjacent_nodes().at(edgeid).to()] -= 1;
             }
         }
         for(auto i = 0; i < Graph::num_nodes(); i++) {
@@ -134,22 +137,24 @@ bool Graph::isEulersch() {
     int i = 1;
     std::vector<Graph::Node> toCheck;
     toCheck.push_back(_nodes[0]);
-    _nodes[0].setMarked(true);
+    _nodes[0].mark();
 
     while(!toCheck.empty()) {
         Graph::Node node = toCheck.back();
         toCheck.pop_back();
 
         for (auto neighbor: node.adjacent_nodes()) {
-            if(!_nodes[neighbor.id()].isMarked()) {
+            if(_nodes[neighbor.to()].mark()) {
                 i++;
-                _nodes[neighbor.id()].setMarked(true);
-                toCheck.push_back(_nodes[neighbor.id()]);
+                toCheck.push_back(_nodes[neighbor.to()]);
             }
         }
     }
+
+    Graph::unmark_all(true);
     return i == this->num_nodes();
 }
+
 /**
  * Die Funktion prüft ob es eine Eulertour gibt und gibt diese als Text aus. Sollte es keine Eulertour geben wird ein Fehler ausgegeben.
  */
@@ -180,15 +185,15 @@ void Graph::findEulertour() {
             int nextNodeId = -1;
             if(dirtype == Graph::directed) {
                 // Bei gerichteten Graphen können wir einfach die nächste ausgehende Kante nehmen
-                nextNodeId = currentNode.adjacent_nodes().at(edge_count[currentPath.top()] - 1).id();
+                nextNodeId = currentNode.adjacent_nodes().at(edge_count[currentPath.top()] - 1).to();
             } else {
                 // Finde eine Kante welche noch nicht bearbeitet wurde
                 for(auto i = 0; i < currentNode.adjacent_nodes().size(); i++) {
                     if(!currentNode.adjacent_nodes().at(i).isMarked()) {
-                        currentNode.markEdge(currentNode.adjacent_nodes().at(i).id());
-                        _nodes[currentNode.adjacent_nodes().at(i).id()].markEdge(currentNodeId);
-                        nextNodeId = currentNode.adjacent_nodes().at(i).id();
-                        edge_count[nextNodeId]--; // Auch hier die Kantenanzahl reduzieren
+                        Graph::Neighbor * neighbor = currentNode.get_edge_at(i);
+                        neighbor -> mark();
+                        edge_count[neighbor -> to()]--; // Auch hier die Kantenanzahl reduzieren
+                        nextNodeId = neighbor -> to();
                         break;
                     }
                 }
@@ -211,8 +216,18 @@ void Graph::findEulertour() {
         std::cout << curNode << std::endl;
         finalPath.pop();
     }
+
+    Graph::unmark_all(false);
 }
 
+void Graph::unmark_all(bool recursive) {
+    for (auto nodeid = 0; nodeid < num_nodes(); nodeid++) {
+        get_node(nodeid) -> unmark();
+        if(recursive) {
+            //get_node(nodeid) -> unmark_all();
+        }
+    }
+}
 
 Graph::Graph(char const * filename, DirType dtype): dirtype(dtype)
 {
